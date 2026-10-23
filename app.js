@@ -227,6 +227,7 @@ function buildSelects() {
   $('compare-select').innerHTML = '<option value="">比較しない</option>' + opts;
   if (prev && dates.includes(prev)) $('current-select').value = prev;
   render();
+  fillStudentFilters();
 }
 
 function render() {
@@ -280,9 +281,9 @@ $('current-select').addEventListener('change', render);
 loadData();
 
 // ===== Step 6(デザイン改善版): 前回との比較 =====
-Chart.defaults.font.family = '"M PLUS Rounded 1c", "BIZ UDPGothic", "Yu Gothic UI", Meiryo, sans-serif';
+Chart.defaults.font.family = '"IBM Plex Sans JP", "BIZ UDPGothic", "Yu Gothic UI", Meiryo, sans-serif';
 Chart.defaults.font.weight = '700';
-Chart.defaults.color = '#1d1b4b';
+Chart.defaults.color = '#16202e';
 
 // 棒の上に数値を表示する小さな部品
 const valueLabels = {
@@ -290,8 +291,8 @@ const valueLabels = {
   afterDatasetsDraw(chart) {
     const ctx = chart.ctx;
     ctx.save();
-    ctx.font = '800 13px "M PLUS Rounded 1c", sans-serif';
-    ctx.fillStyle = '#1d1b4b';
+    ctx.font = '800 13px "IBM Plex Sans JP", sans-serif';
+    ctx.fillStyle = '#16202e';
     ctx.textAlign = 'center';
     chart.data.datasets.forEach((ds, i) => {
       chart.getDatasetMeta(i).data.forEach((bar, j) => {
@@ -356,14 +357,14 @@ function ensureCompareBox() {
 }
 
 function compareChart(canvasId, labels, curData, prevData) {
-  const style = { borderColor: '#1d1b4b', borderWidth: 2.5, borderRadius: 6 };
+  const style = { borderWidth: 0, borderRadius: 2 };
   charts.push(new Chart($(canvasId), {
     type: 'bar',
     data: {
       labels: labels,
       datasets: [
-        Object.assign({ label: '今回', data: curData, backgroundColor: '#3a6df0' }, style),
-        Object.assign({ label: '比較回', data: prevData, backgroundColor: '#cfd3f2' }, style)
+        Object.assign({ label: '今回', data: curData, backgroundColor: '#14243d' }, style),
+        Object.assign({ label: '比較回', data: prevData, backgroundColor: '#aeb8c6' }, style)
       ]
     },
     options: {
@@ -450,3 +451,114 @@ function renderCompare(curDate) {
 }
 
 $('compare-select').addEventListener('change', render);
+
+// ===== Step 9-B: 学生別の成績 =====
+const STATUS_LABEL = { pass: '合格', fail: '不合格', absent: '欠席' };
+const STUDENT_MAX = 100;
+
+function statusOf(r) {
+  if (r.attendance === '欠席') return 'absent';
+  return r.result === '合格' ? 'pass' : 'fail';
+}
+
+// 検索用に正規化(半角カナ→全角、ひらがな→カタカナ、空白を除去)
+function normKana(s) {
+  return String(s || '')
+    .normalize('NFKC')
+    .replace(/[ぁ-ゖ]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60))
+    .replace(/[\s\u3000]+/g, '');
+}
+
+function ensureStudentBox() {
+  let box = $('student-box');
+  if (!box) {
+    box = document.createElement('section');
+    box.id = 'student-box';
+    box.className = 'card';
+    box.innerHTML =
+      '<h2>学生別の成績<span class="h2-sub">フリガナで検索できます</span></h2>' +
+      '<div class="filters">' +
+        '<label>フリガナ(姓・名の一部)' +
+          '<input type="text" id="student-q" placeholder="例:レイチャー / リック / れいちゃーりっく" autocomplete="off"></label>' +
+        '<label>回<select id="student-round"></select></label>' +
+        '<label>級<select id="student-grade"></select></label>' +
+        '<label>判定<select id="student-judge">' +
+          '<option value="">すべて</option><option value="pass">合格</option>' +
+          '<option value="fail">不合格(出席)</option><option value="absent">欠席</option></select></label>' +
+      '</div>' +
+      '<div id="student-area"></div>';
+    $('grade-section').insertAdjacentElement('afterend', box);
+    $('student-q').addEventListener('input', renderStudents);
+    ['student-round', 'student-grade', 'student-judge'].forEach(id =>
+      $(id).addEventListener('change', renderStudents));
+  }
+  return box;
+}
+
+function fillStudentFilters() {
+  ensureStudentBox();
+  const keepRound = $('student-round').value;
+  const keepGrade = $('student-grade').value;
+
+  const map = {};
+  allRows.forEach(r => { map[r.examDate] = r.round; });
+  const dates = Object.keys(map).sort().reverse();
+  const grades = [...new Set(allRows.map(r => r.grade))].sort((a, b) => gradeOrder(a) - gradeOrder(b));
+
+  $('student-round').innerHTML = '<option value="">すべての回</option>' +
+    dates.map(d => `<option value="${esc(d)}">${esc(map[d])}(${esc(d)})</option>`).join('');
+  $('student-grade').innerHTML = '<option value="">すべての級</option>' +
+    grades.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
+
+  if (dates.includes(keepRound)) $('student-round').value = keepRound;
+  if (grades.includes(keepGrade)) $('student-grade').value = keepGrade;
+  renderStudents();
+}
+
+function renderStudents() {
+  const q = normKana($('student-q').value);
+  const rd = $('student-round').value;
+  const gd = $('student-grade').value;
+  const jd = $('student-judge').value;
+
+  const list = allRows.filter(r => {
+    if (rd && r.examDate !== rd) return false;
+    if (gd && r.grade !== gd) return false;
+    if (jd && statusOf(r) !== jd) return false;
+    if (q) {
+      const sei = normKana(r.kanaSei);
+      const mei = normKana(r.kanaMei);
+      if (!(sei + mei).includes(q) && !(mei + sei).includes(q)) return false;
+    }
+    return true;
+  }).sort((x, y) =>
+    String(x.kanaSei).localeCompare(String(y.kanaSei), 'ja') ||
+    String(x.kanaMei).localeCompare(String(y.kanaMei), 'ja') ||
+    y.examDate.localeCompare(x.examDate) ||
+    gradeOrder(x.grade) - gradeOrder(y.grade)
+  );
+
+  const missing = allRows.filter(r => !r.kanaSei && !r.kanaMei).length;
+  let html = `<p class="note">該当 <strong>${list.length}</strong>件` +
+    (list.length > STUDENT_MAX ? `(先頭の${STUDENT_MAX}件を表示しています。条件を絞り込んでください)` : '') + '</p>';
+  if (missing) {
+    html += `<p class="note">フリガナが未登録のデータが${missing}件あります。該当するExcelを保存し直すと入ります。</p>`;
+  }
+  if (!list.length) {
+    $('student-area').innerHTML = html + '<p class="note">条件に合う学生がいません。</p>';
+    return;
+  }
+
+  const rowsHtml = list.slice(0, STUDENT_MAX).map(r => {
+    const s = statusOf(r);
+    return `<tr><th scope="row">${esc(r.kanaSei)}</th><td>${esc(r.kanaMei)}</td>` +
+      `<td>${esc(r.round)}</td><td>${esc(r.grade)}</td><td>${esc(r.attendance)}</td>` +
+      `<td class="num">${s === 'absent' ? '-' : esc(r.score)}</td>` +
+      `<td class="st ${s}">${STATUS_LABEL[s]}</td></tr>`;
+  }).join('');
+
+  $('student-area').innerHTML = html +
+    '<div class="table-wrap"><table class="data-table student-table">' +
+    '<tr><th>フリガナ(姓)</th><th>フリガナ(名)</th><th>回</th><th>級</th><th>出欠</th>' +
+    '<th class="num">点数</th><th class="st">判定</th></tr>' + rowsHtml + '</table></div>';
+}
