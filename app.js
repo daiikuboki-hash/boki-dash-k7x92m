@@ -454,7 +454,7 @@ $('compare-select').addEventListener('change', render);
 
 // ===== Step 9-B: 学生別の成績 =====
 const STATUS_LABEL = { pass: '合格', fail: '不合格', absent: '欠席' };
-const STUDENT_MAX = 100;
+const STUDENT_MAX = 5;
 
 function statusOf(r) {
   if (r.attendance === '欠席') return 'absent';
