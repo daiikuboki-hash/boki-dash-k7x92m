@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>簿記検定 結果ダッシュボード</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="header">
+    <h1>簿記検定 結果ダッシュボード</h1>
+  </header>
+
+  <main class="container">
+
+    <!-- 接続設定 -->
+    <section class="card" id="settings-section">
+      <h2>1. 接続設定</h2>
+      <p class="note">この内容はこのブラウザにだけ保存され、コードには書きません。</p>
+      <label>ウェブアプリのURL
+        <input type="text" id="gas-url" placeholder="https://script.google.com/macros/s/.../exec">
+      </label>
+      <label>合言葉
+        <input type="password" id="gas-key">
+      </label>
+      <button id="save-settings" type="button">設定を保存</button>
+      <span id="settings-msg" class="msg"></span>
+    </section>
+
+    <!-- Excel読み込み -->
+    <section class="card" id="upload-section">
+      <h2>2. Excelを読み込む</h2>
+      <p class="note">級ごとに分かれたExcelを、まとめて選べます。</p>
+      <input type="file" id="file-input" accept=".xlsx" multiple>
+      <div id="upload-preview"></div>
+      <button id="upload-btn" type="button" disabled>スプレッドシートに保存</button>
+      <span id="upload-msg" class="msg"></span>
+    </section>
+
+    <!-- 回の選択 -->
+    <section class="card" id="select-section">
+      <h2>3. 表示する回</h2>
+      <label>今回
+        <select id="current-select"></select>
+      </label>
+      <label>比較する回
+        <select id="compare-select"></select>
+      </label>
+    </section>
+
+    <!-- 全体サマリー -->
+    <section class="card" id="summary-section">
+      <h2>全体の結果</h2>
+      <div id="summary-cards" class="cards"></div>
+      <div class="chart-row">
+        <div class="chart-box"><canvas id="chart-attendance"></canvas></div>
+        <div class="chart-box"><canvas id="chart-pass"></canvas></div>
+      </div>
+    </section>
+
+    <!-- 級ごと -->
+    <section class="card" id="grade-section">
+      <h2>級ごとの結果</h2>
+      <div id="grade-blocks"></div>
+    </section>
+
+  </main>
+
+  <!-- ライブラリ(バージョン固定) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
